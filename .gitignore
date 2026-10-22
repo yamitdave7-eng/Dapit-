@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+!.env.example
+
+# local DAPIT data and export bundles
+/.data/
+/dapit-platform.zip
+
