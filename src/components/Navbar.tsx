@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ActiveTab } from '@/types';
 import type { AccountProfile } from '@/types/auth';
-import { BriefcaseBusiness, CalendarDays, ChevronDown, Compass, LayoutDashboard, LogOut, MessageCircle, Moon, Plus, Search, Store, Sun, UsersRound } from 'lucide-react';
+import { BriefcaseBusiness, CalendarDays, ChevronDown, Compass, LayoutDashboard, LogOut, MessageCircle, MessageSquareText, Moon, Plus, Search, Store, Sun, UsersRound } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -24,6 +24,7 @@ const navigation = [
   { tab: 'events', label: 'Events', icon: CalendarDays },
   { tab: 'jobs', label: 'Work', icon: BriefcaseBusiness },
   { tab: 'talent', label: 'Talent', icon: UsersRound },
+  { tab: 'messages', label: 'Messages', icon: MessageSquareText },
   { tab: 'community', label: 'Community', icon: MessageCircle },
   { tab: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
 ] as const;

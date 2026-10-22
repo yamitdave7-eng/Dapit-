@@ -65,6 +65,18 @@ create table if not exists public.login_history (
 );
 create index if not exists login_history_created_at_idx on public.login_history(created_at desc);
 
+create table if not exists public.direct_messages (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  read_at timestamptz,
+  check (sender_id <> recipient_id)
+);
+create index if not exists direct_messages_sender_created_idx on public.direct_messages(sender_id, created_at desc);
+create index if not exists direct_messages_recipient_created_idx on public.direct_messages(recipient_id, created_at desc);
+
 create or replace function public.current_profile_role()
 returns text
 language sql stable security definer
@@ -199,6 +211,7 @@ alter table public.applications enable row level security;
 alter table public.record_interactions enable row level security;
 alter table public.social_connections enable row level security;
 alter table public.login_history enable row level security;
+alter table public.direct_messages enable row level security;
 create or replace function public.prepare_application()
 returns trigger
 language plpgsql security definer
@@ -245,6 +258,8 @@ grant delete on public.record_interactions to authenticated;
 grant select, insert, update, delete on public.social_connections to authenticated;
 grant select, insert on public.login_history to authenticated;
 grant usage, select on sequence public.login_history_id_seq to authenticated;
+grant select, insert on public.direct_messages to authenticated;
+grant update (read_at) on public.direct_messages to authenticated;
 grant usage on schema public to anon, authenticated;
 grant execute on function public.current_profile_role() to authenticated;
 grant execute on function public.is_admin() to authenticated;
@@ -326,6 +341,17 @@ with check (user_id = (select auth.uid()) and lower(email) = lower(coalesce((sel
 drop policy if exists login_history_admin_read on public.login_history;
 create policy login_history_admin_read on public.login_history for select to authenticated
 using ((select public.is_admin()));
+
+drop policy if exists direct_messages_read_participant on public.direct_messages;
+create policy direct_messages_read_participant on public.direct_messages for select to authenticated
+using (sender_id = (select auth.uid()) or recipient_id = (select auth.uid()));
+drop policy if exists direct_messages_insert_sender on public.direct_messages;
+create policy direct_messages_insert_sender on public.direct_messages for insert to authenticated
+with check (sender_id = (select auth.uid()) and sender_id <> recipient_id and exists (select 1 from public.profiles where id = recipient_id));
+drop policy if exists direct_messages_mark_read_recipient on public.direct_messages;
+create policy direct_messages_mark_read_recipient on public.direct_messages for update to authenticated
+using (recipient_id = (select auth.uid()))
+with check (recipient_id = (select auth.uid()) and read_at is not null);
 
 
 

@@ -16,7 +16,7 @@ Requirements: Node.js 20.9 or newer and a Supabase project.
 1. Install packages with `npm install`.
 2. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the Supabase project.
 3. In Supabase SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql).
-4. For the current social and admin features, run [`supabase/social-network-analytics.sql`](supabase/social-network-analytics.sql) too. It creates follow/friend connections and a private login history visible to admins. Signed-in members can see other members' public profile fields (name, role, location, bio, and avatar) in the People directory; email addresses remain private except in the admin login history.
+4. For social, messaging, and admin features, run [`supabase/social-network-analytics.sql`](supabase/social-network-analytics.sql) and [`supabase/messaging.sql`](supabase/messaging.sql) too. They enable follow/friend connections, private direct messages, and sign-in history visible to admins. Signed-in members can see other members' public profile fields (name, role, location, bio, and avatar) in People & Skills and Messages; email addresses remain private except in the admin login history.
 5. In Supabase Authentication settings, set the Site URL to your local app URL (`http://localhost:3000` while developing) and allow redirects to `http://localhost:3000/auth/callback` and `http://localhost:3000/reset-password`.
 6. Start the app with `npm run dev` and visit [http://localhost:3000](http://localhost:3000).
 7. Create an account through the app. If email confirmation is enabled, confirm the address before signing in.
@@ -40,7 +40,7 @@ After that account signs in again, the administrator workspace is available from
 
 1. Push the project to GitHub and import the repository in Vercel.
 2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to Vercel for Production (and Preview if needed).
-3. Run `supabase/schema.sql` and `supabase/social-network-analytics.sql` in the Supabase project before deploying these features.
+3. Run `supabase/schema.sql`, `supabase/social-network-analytics.sql`, and `supabase/messaging.sql` in the Supabase project before using these features.
 4. In Supabase Authentication settings, set the Site URL to the production domain and add `https://YOUR_DOMAIN/auth/callback` and `https://YOUR_DOMAIN/reset-password` to the allowed redirect URLs. Add preview domains only when you intend to use them.
 5. Deploy, then create/confirm the first account and promote it to admin with the SQL above.
 
@@ -57,6 +57,7 @@ The publishable Supabase key is designed for browser use; access is controlled b
 - **Dashboard:** applications, event attendance, and business activity
 - **Admin:** member roles, listing moderation, sample listing seeding, private analytics, and recent successful sign-ins
 - **Social:** persistent post likes, follows, and friend requests
+- **Messages:** private member-to-member chats, unread indicators, and member search with friend requests
 
 ## Commands
 

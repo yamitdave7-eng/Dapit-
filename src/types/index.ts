@@ -116,6 +116,21 @@ export interface TalentProfile {
   isAvailable: boolean;
 }
 
-export type ActiveTab = 'all' | 'businesses' | 'events' | 'jobs' | 'talent' | 'community' | 'dashboard';
+export type ActiveTab = 'all' | 'businesses' | 'events' | 'jobs' | 'talent' | 'messages' | 'community' | 'dashboard';
+
+export interface DirectMessage {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface MessageConversation {
+  person: PublicMember;
+  lastMessage: DirectMessage;
+  unreadCount: number;
+}
 
 export type UserRole = 'student' | 'business_owner' | 'resident' | 'admin';
