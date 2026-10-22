@@ -106,4 +106,4 @@ export interface TalentProfile {
 
 export type ActiveTab = 'all' | 'businesses' | 'events' | 'jobs' | 'talent' | 'community' | 'dashboard';
 
-export type UserRole = 'student' | 'business_owner' | 'resident';
+export type UserRole = 'student' | 'business_owner' | 'resident' | 'admin';

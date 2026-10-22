@@ -1,63 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getApplications, createApplication, updateApplicationStatus } from '@/lib/db';
+import { Application } from '@/types';
+import { createApplication, databaseError, getApplications, getJobs, updateApplicationStatus } from '@/lib/db';
+import { isAuthFailure, requireAccount } from '@/lib/api-auth';
 
-export async function GET(request: NextRequest) {
+const validStatuses: Application['status'][] = ['Pending', 'Reviewing', 'Interviewing', 'Accepted', 'Rejected'];
+
+export async function GET() {
+  const auth = await requireAccount();
+  if (isAuthFailure(auth)) return auth.response;
   try {
-    const { searchParams } = new URL(request.url);
-    const businessId = searchParams.get('businessId') || undefined;
-    const applicantEmail = searchParams.get('applicantEmail') || undefined;
-
-    const applications = await getApplications(businessId, applicantEmail);
+    const applications = await getApplications();
     return NextResponse.json({ success: true, data: applications });
   } catch (error) {
-    console.error('Error in GET /api/applications:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch applications' }, { status: 500 });
+    return NextResponse.json({ success: false, error: databaseError(error) }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAccount(['student', 'resident']);
+  if (isAuthFailure(auth)) return auth.response;
   try {
     const body = await request.json();
-    if (!body.jobId || !body.jobTitle || !body.applicantName || !body.applicantEmail) {
-      return NextResponse.json({ success: false, error: 'Job ID, Job Title, Name, and Email are required' }, { status: 400 });
-    }
-
+    if (typeof body.jobId !== 'string') return NextResponse.json({ success: false, error: 'Choose a job before applying.' }, { status: 400 });
+    const job = (await getJobs()).find((item) => item.id === body.jobId);
+    if (!job) return NextResponse.json({ success: false, error: 'This job is no longer available.' }, { status: 404 });
     const application = await createApplication({
-      jobId: body.jobId,
-      jobTitle: body.jobTitle,
-      businessId: body.businessId || 'biz-1',
-      businessName: body.businessName || 'Local Business',
-      applicantName: body.applicantName,
-      applicantEmail: body.applicantEmail,
-      applicantPhone: body.applicantPhone || '',
-      applicantRole: body.applicantRole || 'Applicant',
-      resumeSummary: body.resumeSummary || 'Resume details provided in application.',
-      portfolioUrl: body.portfolioUrl || '',
-      coverNote: body.coverNote || '',
-    });
-
+      jobId: job.id,
+      jobTitle: job.title,
+      businessId: job.businessId,
+      businessName: job.businessName,
+      applicantName: auth.context.profile.display_name,
+      applicantEmail: auth.context.user.email || '',
+      applicantPhone: typeof body.applicantPhone === 'string' ? body.applicantPhone.slice(0, 40) : '',
+      applicantRole: auth.context.profile.role,
+      resumeSummary: typeof body.resumeSummary === 'string' ? body.resumeSummary.slice(0, 3000) : '',
+      portfolioUrl: typeof body.portfolioUrl === 'string' ? body.portfolioUrl.slice(0, 500) : '',
+      coverNote: typeof body.coverNote === 'string' ? body.coverNote.slice(0, 3000) : '',
+    }, auth.context.user.id);
     return NextResponse.json({ success: true, data: application }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/applications:', error);
-    return NextResponse.json({ success: false, error: 'Failed to submit application' }, { status: 500 });
+    return NextResponse.json({ success: false, error: databaseError(error) }, { status: 400 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireAccount(['business_owner', 'admin']);
+  if (isAuthFailure(auth)) return auth.response;
   try {
     const body = await request.json();
-    if (!body.id || !body.status) {
-      return NextResponse.json({ success: false, error: 'Application ID and status are required' }, { status: 400 });
+    if (typeof body.id !== 'string' || !validStatuses.includes(body.status)) {
+      return NextResponse.json({ success: false, error: 'Choose an application and a valid status.' }, { status: 400 });
     }
-
     const updated = await updateApplicationStatus(body.id, body.status);
-    if (!updated) {
-      return NextResponse.json({ success: false, error: 'Application not found' }, { status: 404 });
-    }
-
+    if (!updated) return NextResponse.json({ success: false, error: 'Application not found or not managed by your account.' }, { status: 404 });
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
-    console.error('Error in PATCH /api/applications:', error);
-    return NextResponse.json({ success: false, error: 'Failed to update application' }, { status: 500 });
+    return NextResponse.json({ success: false, error: databaseError(error) }, { status: 400 });
   }
 }

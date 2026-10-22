@@ -1,33 +1,28 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Job, Application, UserRole } from '@/types';
+import { Job, Application } from '@/types';
+import type { AccountProfile } from '@/types/auth';
 import { X, Briefcase, Building2, Send, CheckCircle2, User, Mail, Phone, Link as LinkIcon } from 'lucide-react';
 
 interface ApplyModalProps {
   job: Job | null;
-  userRole: UserRole;
+  profile: AccountProfile | null;
   onClose: () => void;
   onSuccess: (application: Application) => void;
 }
 
 export const ApplyModal: React.FC<ApplyModalProps> = ({
   job,
-  userRole,
+  profile,
   onClose,
   onSuccess,
 }) => {
-  const defaultName = userRole === 'student' ? 'Marcus Tan' : userRole === 'resident' ? 'Sarah Jenkins' : 'Elena Rostova';
-  const defaultEmail = userRole === 'student' ? 'marcus.tan@student.edu' : userRole === 'resident' ? 'sarah.j@localresident.org' : 'elena@artisanroastery.com';
-  const defaultRole = userRole === 'student' ? 'Undergraduate Student (City University)' : 'Local Resident';
-
-  const [name, setName] = useState(defaultName);
-  const [email, setEmail] = useState(defaultEmail);
-  const [phone, setPhone] = useState('(555) 891-2345');
-  const [applicantRole, setApplicantRole] = useState(defaultRole);
-  const [resumeSummary, setResumeSummary] = useState(
-    'Enthusiastic and motivated candidate with customer care background and flexible weekend availability.'
-  );
+  const name = profile?.display_name || '';
+  const email = profile?.email || '';
+  const [phone, setPhone] = useState('');
+  const [applicantRole, setApplicantRole] = useState('');
+  const [resumeSummary, setResumeSummary] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [coverNote, setCoverNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,7 +119,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
                     type="text"
                     required
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    readOnly
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -138,7 +133,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    readOnly
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>

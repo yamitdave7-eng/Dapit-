@@ -1,36 +1,21 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CommunityPost, UserRole } from '@/types';
+import { CommunityPost } from '@/types';
+import type { AccountProfile } from '@/types/auth';
 import { X, MessageSquare } from 'lucide-react';
 
 interface CreatePostModalProps {
-  userRole: UserRole;
+  profile: AccountProfile;
   onClose: () => void;
   onSuccess: (post: CommunityPost) => void;
 }
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
-  userRole,
+  profile,
   onClose,
   onSuccess,
 }) => {
-  const defaultAuthor =
-    userRole === 'business_owner'
-      ? 'Elena Rostova'
-      : userRole === 'student'
-      ? 'Marcus Tan'
-      : 'Sarah Jenkins';
-
-  const defaultRole =
-    userRole === 'business_owner'
-      ? 'Owner @ Artisan Roastery & Café'
-      : userRole === 'student'
-      ? 'Student @ City University'
-      : 'Local Resident & Volunteer';
-
-  const [authorName, setAuthorName] = useState(defaultAuthor);
-  const [authorRole, setAuthorRole] = useState(defaultRole);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<CommunityPost['category']>('Announcement');
   const [content, setContent] = useState('');
@@ -48,8 +33,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         body: JSON.stringify({
           title,
           content,
-          authorName,
-          authorRole,
           category,
           tags: tags.split(',').map((t) => t.trim()),
         }),
@@ -91,12 +74,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-slate-900 dark:text-white">
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Your Name</label>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Posting as</label>
             <input
               type="text"
               required
-              value={authorName}
-              onChange={(e) => setAuthorName(e.target.value)}
+              value={profile.display_name}
+              readOnly
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>

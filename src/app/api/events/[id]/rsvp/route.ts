@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { rsvpEvent } from '@/lib/db';
+import { databaseError, rsvpEvent } from '@/lib/db';
+import { isAuthFailure, requireAccount } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAccount();
+  if (isAuthFailure(auth)) return auth.response;
   try {
     const { id } = await context.params;
-    const body = await request.json().catch(() => ({}));
-    const userEmail = body.userEmail || 'visitor@dapit.community';
-
-    const result = await rsvpEvent(id, userEmail);
+    const result = await rsvpEvent(id, auth.context.user.id);
     if (!result) {
       return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json({ success: true, data: result });
   } catch (error) {
-    console.error('Error in POST /api/events/[id]/rsvp:', error);
-    return NextResponse.json({ success: false, error: 'Failed to update RSVP' }, { status: 500 });
+    return NextResponse.json({ success: false, error: databaseError(error) }, { status: 400 });
   }
 }

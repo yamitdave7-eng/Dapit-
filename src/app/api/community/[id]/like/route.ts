@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { likeCommunityPost } from '@/lib/db';
+import { databaseError, likeCommunityPost } from '@/lib/db';
+import { isAuthFailure, requireAccount } from '@/lib/api-auth';
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAccount();
+  if (isAuthFailure(auth)) return auth.response;
   try {
     const { id } = await context.params;
-    const post = await likeCommunityPost(id);
+    const post = await likeCommunityPost(id, auth.context.user.id);
     if (!post) {
       return NextResponse.json({ success: false, error: 'Post not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data: post });
   } catch (error) {
-    console.error('Error in POST /api/community/[id]/like:', error);
-    return NextResponse.json({ success: false, error: 'Failed to like post' }, { status: 500 });
+    return NextResponse.json({ success: false, error: databaseError(error) }, { status: 400 });
   }
 }

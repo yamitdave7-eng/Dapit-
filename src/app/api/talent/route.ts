@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTalentProfiles, createTalentProfile } from '@/lib/db';
+import { createTalentProfile, databaseError, getTalentProfiles } from '@/lib/db';
+import { isAuthFailure, requireAccount } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,35 +11,35 @@ export async function GET(request: NextRequest) {
     const talent = await getTalentProfiles(search, role);
     return NextResponse.json({ success: true, data: talent });
   } catch (error) {
-    console.error('Error in GET /api/talent:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch talent' }, { status: 500 });
+    return NextResponse.json({ success: false, error: databaseError(error) }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAccount();
+  if (isAuthFailure(auth)) return auth.response;
   try {
     const body = await request.json();
-    if (!body.name || !body.title || !body.contactEmail) {
-      return NextResponse.json({ success: false, error: 'Name, title, and contact email are required' }, { status: 400 });
+    if (!body.title) {
+      return NextResponse.json({ success: false, error: 'A professional title is required.' }, { status: 400 });
     }
 
     const profile = await createTalentProfile({
-      name: body.name,
-      title: body.title,
-      role: body.role || 'Student',
+      name: auth.context.profile.display_name,
+      title: String(body.title).slice(0, 120),
+      role: auth.context.profile.role === 'student' ? 'Student' : auth.context.profile.role === 'business_owner' ? 'Local Freelancer' : 'Career Changer',
       universityOrOrg: body.universityOrOrg || 'Local Community',
       bio: body.bio || '',
       skills: Array.isArray(body.skills) ? body.skills : (body.skills ? body.skills.split(',').map((s: string) => s.trim()) : ['Communication']),
       lookingFor: Array.isArray(body.lookingFor) ? body.lookingFor : (body.lookingFor ? body.lookingFor.split(',').map((l: string) => l.trim()) : ['Opportunities']),
       avatar: body.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      contactEmail: body.contactEmail,
+      contactEmail: auth.context.user.email || '',
       portfolioUrl: body.portfolioUrl || '',
       isAvailable: body.isAvailable ?? true,
-    });
+    }, auth.context.user.id);
 
     return NextResponse.json({ success: true, data: profile }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/talent:', error);
-    return NextResponse.json({ success: false, error: 'Failed to create talent profile' }, { status: 500 });
+    return NextResponse.json({ success: false, error: databaseError(error) }, { status: 400 });
   }
 }

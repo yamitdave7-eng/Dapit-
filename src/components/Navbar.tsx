@@ -2,483 +2,58 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ActiveTab, UserRole } from '@/types';
-import {
-  Compass,
-  Store,
-  Calendar,
-  Briefcase,
-  Users,
-  MessageSquare,
-  LayoutDashboard,
-  PlusCircle,
-  Coffee,
-  GraduationCap,
-  Home as HomeIcon,
-  Sun,
-  Moon,
-  Search,
-  LogIn,
-  ChevronDown,
-} from 'lucide-react';
+import { ActiveTab } from '@/types';
+import type { AccountProfile } from '@/types/auth';
+import { BriefcaseBusiness, CalendarDays, ChevronDown, Compass, LayoutDashboard, LogOut, MessageCircle, Moon, Plus, Search, Store, Sun, UsersRound } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
-  userRole: UserRole;
-  setUserRole: (role: UserRole) => void;
+  profile: AccountProfile | null;
+  onSignOut: () => void;
   onOpenCreate: (type: 'business' | 'event' | 'job' | 'post' | 'talent') => void;
-  applicationCount: number;
   darkMode: boolean;
   toggleDarkMode: () => void;
-  searchQuery?: string;
-  setSearchQuery?: (q: string) => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
-  activeTab,
-  setActiveTab,
-  userRole,
-  setUserRole,
-  onOpenCreate,
-  applicationCount,
-  darkMode,
-  toggleDarkMode,
-  searchQuery = '',
-  setSearchQuery,
-}) => {
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+const navigation = [
+  { tab: 'all', label: 'Explore', icon: Compass },
+  { tab: 'businesses', label: 'Places', icon: Store },
+  { tab: 'events', label: 'Events', icon: CalendarDays },
+  { tab: 'jobs', label: 'Work', icon: BriefcaseBusiness },
+  { tab: 'talent', label: 'Talent', icon: UsersRound },
+  { tab: 'community', label: 'Community', icon: MessageCircle },
+  { tab: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+] as const;
 
-  const roleDetails = {
-    business_owner: {
-      name: 'Elena Rostova',
-      title: 'Owner @ Artisan Roastery',
-      icon: Coffee,
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=120&q=80',
-    },
-    student: {
-      name: 'Marcus Tan',
-      title: 'Undergraduate @ City University',
-      icon: GraduationCap,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-    },
-    resident: {
-      name: 'Sarah Jenkins',
-      title: 'Riverfront Neighborhood Resident',
-      icon: HomeIcon,
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80',
-    },
-  };
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, profile, onSignOut, onOpenCreate, darkMode, toggleDarkMode, searchQuery, setSearchQuery }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const accountName = profile?.display_name || 'Your account';
+  const avatar = profile?.avatar_url || '';
 
-  const currentRole = roleDetails[userRole];
+  return <header className="sticky top-0 z-50 border-b border-[#e4e9e4] bg-white/95 shadow-[0_2px_12px_-10px_rgba(0,0,0,.22)] backdrop-blur-xl dark:border-[#304238] dark:bg-[#17221b]/95">
+    <div className="mx-auto flex h-[68px] max-w-[1440px] items-center gap-4 px-4 sm:px-6">
+      <button onClick={() => setActiveTab('all')} className="flex shrink-0 items-center gap-2.5" aria-label="DAPIT explore"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#17613f] text-lg font-black text-white">D</span><span className="hidden text-xl font-extrabold tracking-tight text-[#17613f] dark:text-emerald-300 sm:inline">dapit</span></button>
 
-  return (
-    <header className="sticky top-0 z-50 w-full bg-white dark:bg-[#1f242b] border-b border-[#e8e6df] dark:border-[#2e3742] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
-          {/* Left: Brand Logo + Integrated Search Bar (LinkedIn Style) */}
-          <div className="flex items-center space-x-3 flex-1 max-w-xs sm:max-w-md">
-            {/* Logo */}
-            <div
-              onClick={() => setActiveTab('all')}
-              className="flex items-center space-x-2 cursor-pointer shrink-0"
-            >
-              <div className="w-9 h-9 rounded-lg bg-[#057642] flex items-center justify-center text-white font-black text-lg shadow-xs">
-                D
-              </div>
-              <span className="font-extrabold text-lg tracking-tight text-[#057642] dark:text-emerald-400 hidden xl:inline">
-                dapit
-              </span>
-            </div>
+      <label className="relative hidden min-w-40 max-w-sm flex-1 md:block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search places, work, people…" className="w-full rounded-xl border border-transparent bg-[#f2f5f2] py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-700/30 focus:bg-white focus:ring-4 focus:ring-emerald-700/10 dark:bg-[#223128] dark:text-white dark:focus:bg-[#17221b]" /></label>
 
-            {/* Embedded Search Input */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-                placeholder="Search places, services, jobs, people..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-[13px] rounded-lg bg-[#edf3f8]/80 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 border border-transparent focus:border-emerald-600 focus:bg-white dark:focus:bg-slate-900 focus:outline-none transition-all"
-              />
-            </div>
-          </div>
+      <nav aria-label="Main navigation" className="ml-auto hidden h-full items-center gap-1 lg:flex">
+        {navigation.map(({ tab, label, icon: Icon }) => <button key={tab} onClick={() => setActiveTab(tab)} className={`relative flex h-full min-w-[66px] flex-col items-center justify-center gap-1 px-2 text-[11px] font-semibold transition ${activeTab === tab ? 'text-[#17613f] dark:text-emerald-300' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Icon className="h-[19px] w-[19px]" /><span>{label}</span>{activeTab === tab && <span className="absolute inset-x-2 bottom-0 h-[3px] rounded-t-full bg-[#17613f] dark:bg-emerald-300" />}</button>)}
+      </nav>
 
-          {/* Center: Iconic LinkedIn Vertical Navigation Items */}
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2 h-full">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`relative flex flex-col items-center justify-center px-3.5 h-full text-[11px] font-medium transition-all ${
-                activeTab === 'all'
-                  ? 'text-[#191919] dark:text-white font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Compass className={`w-5 h-5 mb-0.5 ${activeTab === 'all' ? 'text-[#057642] dark:text-emerald-400' : ''}`} />
-              <span>Home</span>
-              {activeTab === 'all' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#057642] dark:bg-emerald-400 rounded-t-full"></span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('businesses')}
-              className={`relative flex flex-col items-center justify-center px-3.5 h-full text-[11px] font-medium transition-all ${
-                activeTab === 'businesses'
-                  ? 'text-[#191919] dark:text-white font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Store className={`w-5 h-5 mb-0.5 ${activeTab === 'businesses' ? 'text-[#057642] dark:text-emerald-400' : ''}`} />
-              <span>LocalLens</span>
-              {activeTab === 'businesses' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#057642] dark:bg-emerald-400 rounded-t-full"></span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('events')}
-              className={`relative flex flex-col items-center justify-center px-3.5 h-full text-[11px] font-medium transition-all ${
-                activeTab === 'events'
-                  ? 'text-[#191919] dark:text-white font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Calendar className={`w-5 h-5 mb-0.5 ${activeTab === 'events' ? 'text-[#057642] dark:text-emerald-400' : ''}`} />
-              <span>Events</span>
-              {activeTab === 'events' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#057642] dark:bg-emerald-400 rounded-t-full"></span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('jobs')}
-              className={`relative flex flex-col items-center justify-center px-3.5 h-full text-[11px] font-medium transition-all ${
-                activeTab === 'jobs'
-                  ? 'text-[#191919] dark:text-white font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Briefcase className={`w-5 h-5 mb-0.5 ${activeTab === 'jobs' ? 'text-[#057642] dark:text-emerald-400' : ''}`} />
-              <span>Jobs</span>
-              {activeTab === 'jobs' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#057642] dark:bg-emerald-400 rounded-t-full"></span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('talent')}
-              className={`relative flex flex-col items-center justify-center px-3.5 h-full text-[11px] font-medium transition-all ${
-                activeTab === 'talent'
-                  ? 'text-[#191919] dark:text-white font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Users className={`w-5 h-5 mb-0.5 ${activeTab === 'talent' ? 'text-[#057642] dark:text-emerald-400' : ''}`} />
-              <span>Network</span>
-              {activeTab === 'talent' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#057642] dark:bg-emerald-400 rounded-t-full"></span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('community')}
-              className={`relative flex flex-col items-center justify-center px-3.5 h-full text-[11px] font-medium transition-all ${
-                activeTab === 'community'
-                  ? 'text-[#191919] dark:text-white font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <MessageSquare className={`w-5 h-5 mb-0.5 ${activeTab === 'community' ? 'text-[#057642] dark:text-emerald-400' : ''}`} />
-              <span>Community</span>
-              {activeTab === 'community' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#057642] dark:bg-emerald-400 rounded-t-full"></span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`relative flex flex-col items-center justify-center px-3.5 h-full text-[11px] font-medium transition-all ${
-                activeTab === 'dashboard'
-                  ? 'text-[#191919] dark:text-white font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <LayoutDashboard className={`w-5 h-5 mb-0.5 ${activeTab === 'dashboard' ? 'text-[#057642] dark:text-emerald-400' : ''}`} />
-              <span>Dashboard</span>
-              {applicationCount > 0 && (
-                <span className="absolute top-2 right-4 w-2 h-2 rounded-full bg-emerald-600"></span>
-              )}
-              {activeTab === 'dashboard' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#057642] dark:bg-emerald-400 rounded-t-full"></span>
-              )}
-            </button>
-          </nav>
-
-          {/* Right: Me Profile Dropdown + Quick Post + Theme Toggle */}
-          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={toggleDarkMode}
-              className="p-1.5 sm:p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-[#f4f2ee] dark:hover:bg-slate-800 transition-colors"
-              title="Toggle Light / Dark Mode"
-            >
-              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
-            </button>
-
-            {/* Profile "Me" Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                className="flex flex-col items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
-              >
-                <img
-                  src={currentRole.avatar}
-                  alt={currentRole.name}
-                  className="w-6 h-6 rounded-full object-cover ring-1 ring-slate-300 dark:ring-slate-700"
-                />
-                <div className="hidden sm:flex items-center space-x-0.5 text-[11px] font-medium mt-0.5">
-                  <span className="truncate max-w-14">Me</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </div>
-              </button>
-
-              {profileMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setProfileMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#20262e] rounded-2xl shadow-xl border border-[#e8e6df] dark:border-[#2e3742] p-3 z-50">
-                    <div className="flex items-center space-x-3 pb-3 border-b border-[#f0eee6] dark:border-[#2e3742]">
-                      <img
-                        src={currentRole.avatar}
-                        alt={currentRole.name}
-                        className="w-11 h-11 rounded-full object-cover ring-2 ring-emerald-600/30"
-                      />
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                          {currentRole.name}
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                          {currentRole.title}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
-                        Switch profile
-                      </div>
-                      <button
-                        onClick={() => {
-                          setUserRole('student');
-                          setProfileMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 ${
-                          userRole === 'student'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-[#057642] dark:text-emerald-400'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        <GraduationCap className="w-4 h-4 text-emerald-600" />
-                        <span>Marcus Tan (Student Seeker)</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setUserRole('business_owner');
-                          setProfileMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 ${
-                          userRole === 'business_owner'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-[#057642] dark:text-emerald-400'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        <Coffee className="w-4 h-4 text-amber-600" />
-                        <span>Elena Rostova (Café Owner)</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setUserRole('resident');
-                          setProfileMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 ${
-                          userRole === 'resident'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-[#057642] dark:text-emerald-400'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        <HomeIcon className="w-4 h-4 text-teal-600" />
-                        <span>Sarah Jenkins (Resident)</span>
-                      </button>
-                    </div>
-
-                    <div className="pt-2 mt-2 border-t border-[#f0eee6] dark:border-[#2e3742]">
-                      <Link
-                        href="/login"
-                        className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-bold text-[#057642] dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 flex items-center space-x-1.5"
-                      >
-                        <LogIn className="w-3.5 h-3.5" />
-                        <span>Sign in or create account</span>
-                      </Link>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Quick Post Button */}
-            <div className="relative">
-              <button
-                onClick={() => setCreateMenuOpen(!createMenuOpen)}
-                className="flex items-center space-x-1 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#057642] hover:bg-[#046237] text-white shadow-xs transition-all active:scale-95"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Post</span>
-              </button>
-
-              {createMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setCreateMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-[#20262e] rounded-2xl shadow-xl border border-[#e8e6df] dark:border-[#2e3742] p-1.5 z-50">
-                    <button
-                      onClick={() => {
-                        onOpenCreate('post');
-                        setCreateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 rounded-lg flex items-center space-x-2"
-                    >
-                      <MessageSquare className="w-4 h-4 text-emerald-600" />
-                      <span>Start a Discussion</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onOpenCreate('job');
-                        setCreateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 rounded-lg flex items-center space-x-2"
-                    >
-                      <Briefcase className="w-4 h-4 text-emerald-600" />
-                      <span>Post Job Vacancy</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onOpenCreate('event');
-                        setCreateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 rounded-lg flex items-center space-x-2"
-                    >
-                      <Calendar className="w-4 h-4 text-teal-600" />
-                      <span>Host Community Event</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onOpenCreate('business');
-                        setCreateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 rounded-lg flex items-center space-x-2"
-                    >
-                      <Store className="w-4 h-4 text-emerald-600" />
-                      <span>Register Local Business</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onOpenCreate('talent');
-                        setCreateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 rounded-lg flex items-center space-x-2"
-                    >
-                      <Users className="w-4 h-4 text-teal-600" />
-                      <span>Join Talent Network</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Horizontal Sub-Navigation */}
-        <div className="flex md:hidden overflow-x-auto py-2 space-x-2 border-t border-[#f0eee6] dark:border-[#2e3742] scrollbar-none">
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
-              activeTab === 'all'
-                ? 'bg-[#057642] text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Home
-          </button>
-          <button
-            onClick={() => setActiveTab('businesses')}
-            className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
-              activeTab === 'businesses'
-                ? 'bg-[#057642] text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Places
-          </button>
-          <button
-            onClick={() => setActiveTab('events')}
-            className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
-              activeTab === 'events'
-                ? 'bg-[#057642] text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Events
-          </button>
-          <button
-            onClick={() => setActiveTab('jobs')}
-            className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
-              activeTab === 'jobs'
-                ? 'bg-[#057642] text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Jobs
-          </button>
-          <button
-            onClick={() => setActiveTab('talent')}
-            className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
-              activeTab === 'talent'
-                ? 'bg-[#057642] text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Talent
-          </button>
-          <button
-            onClick={() => setActiveTab('community')}
-            className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
-              activeTab === 'community'
-                ? 'bg-[#057642] text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Community
-          </button>
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${
-              activeTab === 'dashboard'
-                ? 'bg-[#057642] text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Dashboard
-          </button>
-        </div>
+      <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-2">
+        <button onClick={toggleDarkMode} aria-label={darkMode ? 'Switch to light theme' : 'Switch to dark theme'} className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-[#26382d]">{darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
+        {profile?.role === 'admin' && <Link href="/admin" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40 sm:block">Admin</Link>}
+        {profile ? <div className="relative"><button onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} className="flex max-w-[150px] items-center gap-2 rounded-xl px-2 py-1.5 text-left transition hover:bg-slate-50 dark:hover:bg-[#223128]">{avatar ? <img src={avatar} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">{accountName.charAt(0).toUpperCase()}</span>}<span className="hidden min-w-0 sm:block"><span className="block truncate text-xs font-semibold">{accountName}</span><span className="block text-[10px] capitalize text-slate-500 dark:text-slate-400">{profile.role.replace('_', ' ')}</span></span><ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 sm:block" /></button>{menuOpen && <><button aria-label="Close profile menu" className="fixed inset-0 z-40 cursor-default" onClick={() => setMenuOpen(false)} /><div className="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-[#e4e9e4] bg-white p-2 shadow-xl dark:border-[#304238] dark:bg-[#1b2821]"><div className="border-b border-slate-100 px-3 py-2 dark:border-slate-700"><p className="truncate text-sm font-semibold">{accountName}</p><p className="truncate text-xs text-slate-500 dark:text-slate-400">{profile.email}</p></div>{profile.role === 'admin' && <Link href="/admin" onClick={() => setMenuOpen(false)} className="mt-1 block rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-[#26382d]">Administrator workspace</Link>}<Link href="/" onClick={() => { setActiveTab('dashboard'); setMenuOpen(false); }} className="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-[#26382d]">My dashboard</Link><button onClick={onSignOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><LogOut className="h-4 w-4" /> Sign out</button></div></>}</div> : <Link href="/login" className="rounded-xl border border-[#dce5dc] px-3 py-2 text-xs font-bold text-[#174d37] transition hover:bg-emerald-50 dark:border-[#3b5043] dark:text-emerald-300 dark:hover:bg-[#223128]">Sign in</Link>}
+        <div className="relative"><button onClick={() => setCreateOpen((open) => !open)} aria-expanded={createOpen} className="inline-flex items-center gap-1.5 rounded-xl bg-[#17613f] px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#104d32]"><Plus className="h-4 w-4" /><span className="hidden sm:inline">Create</span></button>{createOpen && <><button aria-label="Close create menu" className="fixed inset-0 z-40 cursor-default" onClick={() => setCreateOpen(false)} /><div className="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-[#e4e9e4] bg-white p-1.5 shadow-xl dark:border-[#304238] dark:bg-[#1b2821]">{[
+          { type: 'business', label: 'Add a place or service', icon: Store }, { type: 'event', label: 'Create an event', icon: CalendarDays }, { type: 'job', label: 'Post a job or project', icon: BriefcaseBusiness }, { type: 'talent', label: 'Share your skills', icon: UsersRound }, { type: 'post', label: 'Start a discussion', icon: MessageCircle },
+        ].map(({ type, label, icon: Icon }) => <button key={type} onClick={() => { onOpenCreate(type as 'business' | 'event' | 'job' | 'post' | 'talent'); setCreateOpen(false); }} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-700 transition hover:bg-emerald-50 dark:text-slate-200 dark:hover:bg-[#26382d]"><Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />{label}</button>)}</div></>}</div>
       </div>
-    </header>
-  );
+    </div>
+    <div className="flex gap-1 overflow-x-auto border-t border-slate-100 px-3 py-2 lg:hidden dark:border-slate-800">{navigation.map(({ tab, label }) => <button key={tab} onClick={() => setActiveTab(tab)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${activeTab === tab ? 'bg-[#17613f] text-white' : 'bg-slate-100 text-slate-600 dark:bg-[#223128] dark:text-slate-300'}`}>{label}</button>)}</div>
+    <div className="px-4 pb-2 md:hidden sm:px-6"><label className="relative block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search places, work, people…" className="w-full rounded-xl bg-[#f2f5f2] py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-700/20 dark:bg-[#223128]" /></label></div>
+  </header>;
 };

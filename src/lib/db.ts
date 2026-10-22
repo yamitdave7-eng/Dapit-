@@ -1,363 +1,244 @@
-import fs from 'fs';
-import path from 'path';
+import 'server-only';
+import { randomUUID } from 'node:crypto';
+import { createClient } from '@/lib/supabase/server';
+import type { Application, Business, CommunityPost, Event, Job, TalentProfile } from '@/types';
 import {
-  Business,
-  Event,
-  Job,
-  Application,
-  CommunityPost,
-  TalentProfile,
-} from '@/types';
-import {
+  initialApplications,
   initialBusinesses,
+  initialCommunityPosts,
   initialEvents,
   initialJobs,
-  initialApplications,
-  initialCommunityPosts,
   initialTalent,
-} from './initialData';
+} from '@/lib/initialData';
 
-interface DatabaseSchema {
-  businesses: Business[];
-  events: Event[];
-  jobs: Job[];
-  applications: Application[];
-  communityPosts: CommunityPost[];
-  talent: TalentProfile[];
+type RecordKind = 'business' | 'event' | 'job' | 'community' | 'talent';
+type MarketplaceRow = { id: string; kind: RecordKind; owner_id: string | null; data: Record<string, unknown> };
+type ApplicationRow = { id: string; job_id: string; applicant_id: string; data: Record<string, unknown>; status: Application['status']; created_at: string };
+
+const isConfigured = () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+const makeId = (prefix: string) => `${prefix}-${randomUUID()}`;
+const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Database request failed';
+
+async function listRecords<T>(kind: RecordKind): Promise<T[]> {
+  if (!isConfigured()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('marketplace_records').select('id,kind,owner_id,data').eq('kind', kind).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data as MarketplaceRow[]).map((row) => row.data as T);
 }
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const DB_FILE = path.join(DATA_DIR, 'dapit_db.json');
-
-// Global memory cache to prevent re-reading on every request in dev
-let memoryDb: DatabaseSchema | null = null;
-
-function loadDatabase(): DatabaseSchema {
-  if (memoryDb) {
-    return memoryDb;
-  }
-
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, 'utf-8');
-      const parsed = JSON.parse(raw) as DatabaseSchema;
-      memoryDb = parsed;
-      return parsed;
-    }
-  } catch (err) {
-    console.warn('Could not read persistent DB file, using initial data:', err);
-  }
-
-  // Initialize fresh
-  const freshDb: DatabaseSchema = {
-    businesses: [...initialBusinesses],
-    events: [...initialEvents],
-    jobs: [...initialJobs],
-    applications: [...initialApplications],
-    communityPosts: [...initialCommunityPosts],
-    talent: [...initialTalent],
-  };
-
-  saveDatabase(freshDb);
-  memoryDb = freshDb;
-  return freshDb;
+async function insertRecord<T extends { id: string }>(kind: RecordKind, data: Omit<T, 'id'>, ownerId: string): Promise<T> {
+  if (!isConfigured()) throw new Error('Connect Supabase to save marketplace content. See the deployment setup in README.md.');
+  const id = makeId(kind);
+  const record = { ...data, id } as T;
+  const supabase = await createClient();
+  const { error } = await supabase.from('marketplace_records').insert({ id, kind, owner_id: ownerId, data: record });
+  if (error) throw error;
+  return record;
 }
 
-function saveDatabase(db: DatabaseSchema) {
-  memoryDb = db;
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Could not write persistent DB file, running in-memory:', err);
-  }
+function matchesSearch(value: unknown, search?: string) {
+  if (!search) return true;
+  return JSON.stringify(value).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
 }
 
-// Business operations
 export async function getBusinesses(search?: string, category?: string) {
-  const db = loadDatabase();
-  let list = db.businesses;
-
-  if (category && category !== 'All') {
-    list = list.filter((b) => b.category === category);
-  }
-
-  if (search) {
-    const q = search.toLowerCase();
-    list = list.filter(
-      (b) =>
-        b.name.toLowerCase().includes(q) ||
-        b.tagline.toLowerCase().includes(q) ||
-        b.description.toLowerCase().includes(q) ||
-        b.neighborhood.toLowerCase().includes(q) ||
-        b.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  }
-
-  return list;
+  const businesses = isConfigured() ? await listRecords<Business>('business') : [...initialBusinesses];
+  const events = isConfigured() ? await listRecords<Event>('event') : [...initialEvents];
+  const jobs = isConfigured() ? await listRecords<Job>('job') : [...initialJobs];
+  return businesses
+    .filter((business) => !category || category === 'All' || business.category === category)
+    .filter((business) => matchesSearch(business, search))
+    .map((business) => {
+      const activeJobsCount = jobs.filter((job) => job.businessId === business.id).length;
+      const activeEventsCount = events.filter((event) => event.businessId === business.id).length;
+      return { ...business, activeJobsCount, activeEventsCount, hiringActive: activeJobsCount > 0 };
+    });
 }
 
 export async function getBusinessById(id: string) {
-  const db = loadDatabase();
-  return db.businesses.find((b) => b.id === id) || null;
+  return (await getBusinesses()).find((business) => business.id === id) || null;
 }
 
-export async function createBusiness(data: Omit<Business, 'id' | 'rating' | 'reviewsCount' | 'isVerified' | 'activeJobsCount' | 'activeEventsCount'>) {
-  const db = loadDatabase();
-  const newBusiness: Business = {
+export async function createBusiness(data: Omit<Business, 'id' | 'rating' | 'reviewsCount' | 'isVerified' | 'activeJobsCount' | 'activeEventsCount'>, ownerId: string) {
+  return insertRecord<Business>('business', {
     ...data,
-    id: `biz-${Date.now()}`,
-    rating: 5.0,
-    reviewsCount: 1,
-    isVerified: true,
+    rating: 0,
+    reviewsCount: 0,
+    isVerified: false,
     activeJobsCount: 0,
     activeEventsCount: 0,
-  };
-  db.businesses.unshift(newBusiness);
-  saveDatabase(db);
-  return newBusiness;
+  }, ownerId);
 }
 
-// Event operations
-export async function getEvents(search?: string, category?: string) {
-  const db = loadDatabase();
-  let list = db.events;
-
-  if (category && category !== 'All') {
-    list = list.filter((e) => e.category === category);
+export async function getEvents(search?: string, category?: string, userId?: string) {
+  const events = isConfigured() ? await listRecords<Event>('event') : [...initialEvents];
+  if (!isConfigured() || !userId) {
+    return events.filter((event) => (!category || category === 'All' || event.category === category) && matchesSearch(event, search));
   }
-
-  if (search) {
-    const q = search.toLowerCase();
-    list = list.filter(
-      (e) =>
-        e.title.toLowerCase().includes(q) ||
-        e.description.toLowerCase().includes(q) ||
-        e.businessName.toLowerCase().includes(q) ||
-        e.location.toLowerCase().includes(q) ||
-        e.neighborhood.toLowerCase().includes(q)
-    );
-  }
-
-  return list;
+  const supabase = await createClient();
+  const { data: rsvps, error } = await supabase.from('record_interactions').select('record_id').eq('interaction_type', 'rsvp').eq('user_id', userId);
+  if (error) throw error;
+  const attending = new Set((rsvps || []).map((item) => item.record_id));
+  return events
+    .filter((event) => (!category || category === 'All' || event.category === category) && matchesSearch(event, search))
+    .map((event) => ({ ...event, attendees: attending.has(event.id) ? [userId] : [] }));
 }
 
-export async function createEvent(data: Omit<Event, 'id' | 'rsvpCount' | 'attendees'>) {
-  const db = loadDatabase();
-  const newEvent: Event = {
-    ...data,
-    id: `evt-${Date.now()}`,
-    rsvpCount: 1,
-    attendees: ['you@dapit.community'],
-  };
-  db.events.unshift(newEvent);
-
-  // Update business event count
-  const biz = db.businesses.find((b) => b.id === newEvent.businessId);
-  if (biz) {
-    biz.activeEventsCount += 1;
-  }
-
-  saveDatabase(db);
-  return newEvent;
+export async function createEvent(data: Omit<Event, 'id' | 'rsvpCount' | 'attendees'>, ownerId: string) {
+  return insertRecord<Event>('event', { ...data, rsvpCount: 0, attendees: [] }, ownerId);
 }
 
-export async function rsvpEvent(eventId: string, userEmail: string = 'user@dapit.community') {
-  const db = loadDatabase();
-  const event = db.events.find((e) => e.id === eventId);
+export async function rsvpEvent(eventId: string, userId: string) {
+  if (!isConfigured()) throw new Error('Connect Supabase to RSVP to events.');
+  const event = (await listRecords<Event>('event')).find((item) => item.id === eventId);
   if (!event) return null;
-
-  const hasRsvp = event.attendees.includes(userEmail);
-  if (hasRsvp) {
-    event.attendees = event.attendees.filter((a) => a !== userEmail);
-    event.rsvpCount = Math.max(0, event.rsvpCount - 1);
+  const supabase = await createClient();
+  const { data: existing, error: findError } = await supabase.from('record_interactions').select('record_id').eq('record_id', eventId).eq('interaction_type', 'rsvp').eq('user_id', userId).maybeSingle();
+  if (findError) throw findError;
+  if (existing) {
+    const { error } = await supabase.from('record_interactions').delete().eq('record_id', eventId).eq('interaction_type', 'rsvp').eq('user_id', userId);
+    if (error) throw error;
   } else {
-    event.attendees.push(userEmail);
-    event.rsvpCount += 1;
+    const { error } = await supabase.from('record_interactions').insert({ record_id: eventId, interaction_type: 'rsvp', user_id: userId });
+    if (error) throw error;
   }
-
-  saveDatabase(db);
-  return { event, isAttending: !hasRsvp };
+  return (await getEvents(undefined, undefined, userId)).find((item) => item.id === eventId) || null;
 }
 
-// Job operations
 export async function getJobs(search?: string, jobType?: string, workplaceType?: string) {
-  const db = loadDatabase();
-  let list = db.jobs;
-
-  if (jobType && jobType !== 'All') {
-    list = list.filter((j) => j.jobType === jobType);
-  }
-
-  if (workplaceType && workplaceType !== 'All') {
-    list = list.filter((j) => j.workplaceType === workplaceType);
-  }
-
-  if (search) {
-    const q = search.toLowerCase();
-    list = list.filter(
-      (j) =>
-        j.title.toLowerCase().includes(q) ||
-        j.description.toLowerCase().includes(q) ||
-        j.businessName.toLowerCase().includes(q) ||
-        j.neighborhood.toLowerCase().includes(q) ||
-        j.requirements.some((r) => r.toLowerCase().includes(q))
-    );
-  }
-
-  return list;
+  const jobs = isConfigured() ? await listRecords<Job>('job') : [...initialJobs];
+  return jobs.filter((job) => (!jobType || jobType === 'All' || job.jobType === jobType)
+    && (!workplaceType || workplaceType === 'All' || job.workplaceType === workplaceType)
+    && matchesSearch(job, search));
 }
 
-export async function createJob(data: Omit<Job, 'id' | 'postedAt' | 'applicantsCount'>) {
-  const db = loadDatabase();
-  const newJob: Job = {
-    ...data,
-    id: `job-${Date.now()}`,
-    postedAt: 'Just now',
-    applicantsCount: 0,
-  };
-  db.jobs.unshift(newJob);
-
-  // Update business hiring status
-  const biz = db.businesses.find((b) => b.id === newJob.businessId);
-  if (biz) {
-    biz.hiringActive = true;
-    biz.activeJobsCount += 1;
-  }
-
-  saveDatabase(db);
-  return newJob;
+export async function createJob(data: Omit<Job, 'id' | 'postedAt' | 'applicantsCount'>, ownerId: string) {
+  return insertRecord<Job>('job', { ...data, postedAt: new Date().toISOString(), applicantsCount: 0 }, ownerId);
 }
 
-// Application operations
-export async function getApplications(businessId?: string, applicantEmail?: string) {
-  const db = loadDatabase();
-  let list = db.applications;
-
-  if (businessId) {
-    list = list.filter((a) => a.businessId === businessId);
-  }
-
-  if (applicantEmail) {
-    list = list.filter((a) => a.applicantEmail.toLowerCase() === applicantEmail.toLowerCase());
-  }
-
-  return list;
+function mapApplication(row: ApplicationRow): Application {
+  return { ...(row.data as Omit<Application, 'id' | 'status' | 'appliedAt'>), id: row.id, status: row.status, appliedAt: row.created_at } as Application;
 }
 
-export async function createApplication(data: Omit<Application, 'id' | 'appliedAt' | 'status'>) {
-  const db = loadDatabase();
-  const newApp: Application = {
-    ...data,
-    id: `app-${Date.now()}`,
-    appliedAt: 'Just now',
-    status: 'Pending',
-  };
-  db.applications.unshift(newApp);
+export async function getApplications() {
+  if (!isConfigured()) return [...initialApplications];
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('applications').select('id,job_id,applicant_id,data,status,created_at').order('created_at', { ascending: false });
+  if (error) throw error;
+  return ((data || []) as ApplicationRow[]).map(mapApplication);
+}
 
-  // Increment job applicant count
-  const job = db.jobs.find((j) => j.id === newApp.jobId);
-  if (job) {
-    job.applicantsCount += 1;
-  }
-
-  saveDatabase(db);
-  return newApp;
+export async function createApplication(data: Omit<Application, 'id' | 'appliedAt' | 'status'>, applicantId: string) {
+  if (!isConfigured()) throw new Error('Connect Supabase to submit applications.');
+  const id = makeId('app');
+  const supabase = await createClient();
+  const { data: jobRow, error: jobError } = await supabase.from('marketplace_records').select('id,kind,data').eq('id', data.jobId).eq('kind', 'job').single();
+  if (jobError || !jobRow) throw new Error('This job is no longer available.');
+  const { error } = await supabase.from('applications').insert({ id, job_id: data.jobId, applicant_id: applicantId, data, status: 'Pending' });
+  if (error) throw error;
+  return { ...data, id, status: 'Pending', appliedAt: new Date().toISOString() } as Application;
 }
 
 export async function updateApplicationStatus(id: string, status: Application['status']) {
-  const db = loadDatabase();
-  const app = db.applications.find((a) => a.id === id);
-  if (!app) return null;
-
-  app.status = status;
-  saveDatabase(db);
-  return app;
+  if (!isConfigured()) throw new Error('Connect Supabase to manage applications.');
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('applications').update({ status, updated_at: new Date().toISOString() }).eq('id', id).select('id,job_id,applicant_id,data,status,created_at').maybeSingle();
+  if (error) throw error;
+  return data ? mapApplication(data as ApplicationRow) : null;
 }
 
-// Community posts operations
 export async function getCommunityPosts(category?: string) {
-  const db = loadDatabase();
-  let list = db.communityPosts;
-
-  if (category && category !== 'All') {
-    list = list.filter((p) => p.category === category);
-  }
-
-  return list;
+  const posts = isConfigured() ? await listRecords<CommunityPost>('community') : [...initialCommunityPosts];
+  return posts.filter((post) => (!category || category === 'All' || post.category === category) && matchesSearch(post, category === 'All' ? undefined : undefined));
 }
 
-export async function createCommunityPost(data: Omit<CommunityPost, 'id' | 'likes' | 'commentsCount' | 'createdAt'>) {
-  const db = loadDatabase();
-  const newPost: CommunityPost = {
-    ...data,
-    id: `post-${Date.now()}`,
-    likes: 1,
-    commentsCount: 0,
-    createdAt: 'Just now',
-  };
-  db.communityPosts.unshift(newPost);
-  saveDatabase(db);
-  return newPost;
+export async function createCommunityPost(data: Omit<CommunityPost, 'id' | 'likes' | 'commentsCount' | 'createdAt'>, ownerId: string) {
+  return insertRecord<CommunityPost>('community', { ...data, likes: 0, commentsCount: 0, createdAt: new Date().toISOString() }, ownerId);
 }
 
-export async function likeCommunityPost(postId: string) {
-  const db = loadDatabase();
-  const post = db.communityPosts.find((p) => p.id === postId);
-  if (!post) return null;
-
-  post.likes += 1;
-  saveDatabase(db);
-  return post;
+export async function likeCommunityPost(postId: string, userId: string) {
+  if (!isConfigured()) throw new Error('Connect Supabase to like community posts.');
+  const supabase = await createClient();
+  const { error } = await supabase.from('record_interactions').upsert({ record_id: postId, interaction_type: 'like', user_id: userId }, { onConflict: 'record_id,interaction_type,user_id', ignoreDuplicates: true });
+  if (error) throw error;
+  return (await getCommunityPosts()).find((post) => post.id === postId) || null;
 }
 
-// Talent operations
 export async function getTalentProfiles(search?: string, role?: string) {
-  const db = loadDatabase();
-  let list = db.talent;
-
-  if (role && role !== 'All') {
-    list = list.filter((t) => t.role === role);
-  }
-
-  if (search) {
-    const q = search.toLowerCase();
-    list = list.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.title.toLowerCase().includes(q) ||
-        t.bio.toLowerCase().includes(q) ||
-        t.skills.some((s) => s.toLowerCase().includes(q)) ||
-        t.lookingFor.some((l) => l.toLowerCase().includes(q))
-    );
-  }
-
-  return list;
+  const profiles = isConfigured() ? await listRecords<TalentProfile>('talent') : [...initialTalent];
+  return profiles.filter((profile) => (!role || role === 'All' || profile.role === role) && matchesSearch(profile, search));
 }
 
-export async function createTalentProfile(data: Omit<TalentProfile, 'id'>) {
-  const db = loadDatabase();
-  const newProfile: TalentProfile = {
-    ...data,
-    id: `talent-${Date.now()}`,
-  };
-  db.talent.unshift(newProfile);
-  saveDatabase(db);
-  return newProfile;
+export async function createTalentProfile(data: Omit<TalentProfile, 'id'>, ownerId: string) {
+  return insertRecord<TalentProfile>('talent', data, ownerId);
 }
 
-// Reset data helper
-export async function resetDatabase() {
-  const freshDb: DatabaseSchema = {
-    businesses: [...initialBusinesses],
-    events: [...initialEvents],
-    jobs: [...initialJobs],
-    applications: [...initialApplications],
-    communityPosts: [...initialCommunityPosts],
-    talent: [...initialTalent],
-  };
-  saveDatabase(freshDb);
-  return freshDb;
+export async function getAdminUsers() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('profiles').select('id,display_name,role,location,created_at').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateUserRole(id: string, role: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('profiles').update({ role }).eq('id', id).select('id,display_name,role,location,created_at').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getAdminSummary() {
+  const supabase = await createClient();
+  const kinds: RecordKind[] = ['business', 'event', 'job', 'community', 'talent'];
+  const counts = await Promise.all(kinds.map(async (kind) => {
+    const { count, error } = await supabase.from('marketplace_records').select('id', { count: 'exact', head: true }).eq('kind', kind);
+    if (error) throw error;
+    return [kind, count || 0] as const;
+  }));
+  const [{ count: users, error: usersError }, { count: applications, error: appsError }] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    supabase.from('applications').select('id', { count: 'exact', head: true }),
+  ]);
+  if (usersError) throw usersError;
+  if (appsError) throw appsError;
+  return { users: users || 0, applications: applications || 0, records: Object.fromEntries(counts) };
+}
+
+export async function getAdminRecords() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('marketplace_records').select('id,kind,owner_id,data,created_at').order('created_at', { ascending: false }).limit(100);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function removeMarketplaceRecord(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('marketplace_records').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function seedDemoRecords() {
+  const supabase = await createClient();
+  const records = [
+    ...initialBusinesses.map((data) => ({ id: data.id, kind: 'business', owner_id: null, data })),
+    ...initialEvents.map((data) => ({ id: data.id, kind: 'event', owner_id: null, data: { ...data, attendees: [], rsvpCount: 0 } })),
+    ...initialJobs.map((data) => ({ id: data.id, kind: 'job', owner_id: null, data: { ...data, applicantsCount: 0 } })),
+    ...initialCommunityPosts.map((data) => ({ id: data.id, kind: 'community', owner_id: null, data })),
+    ...initialTalent.map((data) => ({ id: data.id, kind: 'talent', owner_id: null, data })),
+  ];
+  const { error } = await supabase.from('marketplace_records').upsert(records, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) throw error;
+  return { count: records.length };
+}
+
+export function databaseError(error: unknown) {
+  return messageOf(error);
+}
+
+export async function getOwnedBusinesses(ownerId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('marketplace_records').select('data').eq('kind', 'business').eq('owner_id', ownerId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map((row) => row.data as Business);
 }

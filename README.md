@@ -1,109 +1,64 @@
-# DAPIT — Community Discovery and Career Networking Platform
+# DAPIT
 
-> **DAPIT** combines the community discovery power of **LocalLens** with the career development strength of **CareerLink** into one unified, accessible online platform.
+DAPIT is a multi-category marketplace for places and services, events, jobs and projects, and independent talent. People can browse nearby listings or explore remote and wider-area opportunities. Signed-in members can publish listings, apply to work, RSVP to events, and join community discussions. Business accounts can manage their opportunities, and administrators can manage accounts and listings.
 
----
+## Technology
 
-## 🌟 Project Overview
+- Next.js 16 App Router and Route Handlers
+- React 19, TypeScript, Tailwind CSS 4
+- Supabase Auth and Postgres with row-level security
+- Vercel deployment
 
-DAPIT is designed to connect local residents, small businesses, and job seekers in one shared ecosystem:
-- **Local Businesses & Services (LocalLens):** Directory of neighborhood storefronts, independent cafés, artisan workshops, and service providers.
-- **Community Events (LocalLens):** Hands-on workshops, tasting sessions, tech meetups, and community gatherings.
-- **Career Hub (CareerLink):** Student internships, flexible part-time jobs (barista, retail, tech), and entry-level positions with 1-click Quick Apply.
-- **Talent Network:** Student and local freelancer directory showcasing skills and portfolio links for community hiring.
-- **Neighborhood Board:** Community discussions, announcements, study groups, and local recommendations.
-- **Interactive Management Dashboard:** Live applicant pipeline management for employers (Elena @ Artisan Roastery) and job tracking for students (Marcus Tan).
+## Local setup
 
----
+Requirements: Node.js 20.9 or newer and a Supabase project.
 
-## ☕ The Real-World Café Walkthrough (How it Works)
+1. Install packages with `npm install`.
+2. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the Supabase project.
+3. In Supabase SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql).
+4. In Supabase Authentication settings, set the Site URL to your local app URL (`http://localhost:3000` while developing) and allow redirects to `http://localhost:3000/auth/callback` and `http://localhost:3000/reset-password`.
+5. Start the app with `npm run dev` and visit [http://localhost:3000](http://localhost:3000).
+6. Create an account through the app. If email confirmation is enabled, confirm the address before signing in.
 
-1. **Café Registers on DAPIT:** *Elena Rostova* registers **Artisan Roastery & Café** on LocalLens with address, hours, single-origin menu highlights, and photo gallery.
-2. **Promotes Community Event:** The café schedules a **"Latte Art Mastery & Coffee Tasting Workshop"** for neighborhood residents and students.
-3. **Posts Part-Time Vacancy:** The café lists an opening for a **"Part-Time Weekend Barista"** ($18.50 - $22.00/hr + tips) via CareerLink.
-4. **Discover & Apply:** Students and residents discover the café, RSVP for the workshop, and submit a 1-click job application with resume details!
+Without Supabase configured, public pages use read-only sample listings. Account actions and writes require Supabase; the app does not use local JSON files as production storage.
 
----
+## Make the first administrator
 
-## 💻 100% Free Fullstack Tech Stack
+Create and confirm your account first. In Supabase SQL Editor, replace the email below and run:
 
-This project is built using modern zero-cost tools:
-
-- **Frontend & Fullstack Backend:** [Next.js 16](https://nextjs.org/) (App Router & Route Handlers)
-- **UI & Styling:** [Tailwind CSS v4](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/)
-- **Language:** TypeScript
-- **Database Layer:** Built-in JSON Database / In-Memory Service with pre-seeded data and auto-save (zero external database setup required to run immediately; easily plugs into Supabase or Neon PostgreSQL for production).
-- **Hosting:** Free on [Vercel](https://vercel.com/) or [Cloudflare Pages](https://pages.cloudflare.com/) ($0/month).
-
----
-
-## 🚀 Quick Start Guide (How to Run Locally)
-
-### 1. Requirements
-- [Node.js](https://nodejs.org/) (v18 or higher installed on your computer).
-
-### 2. Install Dependencies
-Open your terminal in the extracted project folder and run:
-```bash
-npm install
+```sql
+update public.profiles p
+set role = 'admin', updated_at = now()
+from auth.users u
+where p.id = u.id and lower(u.email) = lower('YOUR_EMAIL_ADDRESS');
 ```
 
-### 3. Start the Development Server
-```bash
-npm run dev
-```
+After that account signs in again, the administrator workspace is available from the profile menu. Admin access is checked on the server and in database policies.
 
-### 4. Open in Your Browser
-Visit [http://localhost:3000](http://localhost:3000) in your web browser.
+## Deploy to Vercel
 
----
+1. Push the project to GitHub and import the repository in Vercel.
+2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to Vercel for Production (and Preview if needed).
+3. Run `supabase/schema.sql` in the Supabase project before the first deployment.
+4. In Supabase Authentication settings, set the Site URL to the production domain and add `https://YOUR_DOMAIN/auth/callback` and `https://YOUR_DOMAIN/reset-password` to the allowed redirect URLs. Add preview domains only when you intend to use them.
+5. Deploy, then create/confirm the first account and promote it to admin with the SQL above.
 
-## 📁 Project Structure
+The publishable Supabase key is designed for browser use; access is controlled by the SQL row-level security policies. Never put a Supabase service-role key in `NEXT_PUBLIC_*` or in this repository. Database schema changes should be applied to Supabase before deploying code that depends on them.
 
-```text
-├── src/
-│   ├── app/
-│   │   ├── api/                     # Fullstack Serverless API routes
-│   │   │   ├── businesses/          # CRUD for local businesses
-│   │   │   ├── events/              # Events and RSVP endpoints
-│   │   │   │   └── [id]/rsvp/
-│   │   │   ├── jobs/                # CareerLink job openings
-│   │   │   ├── applications/        # Job applications & status PATCH
-│   │   │   ├── community/           # Community discussions & like handler
-│   │   │   │   └── [id]/like/
-│   │   │   ├── talent/              # Public student & talent network
-│   │   │   └── reset/               # 1-click reset to seed data
-│   │   ├── globals.css              # Tailwind styling
-│   │   ├── layout.tsx               # Root layout & SEO metadata
-│   │   └── page.tsx                 # Full interactive DAPIT application
-│   ├── components/                  # React UI components
-│   │   ├── Navbar.tsx               # Brand nav, role switcher, quick post
-│   │   ├── HeroSection.tsx          # Search bar & interactive café flow
-│   │   ├── BusinessCard.tsx         # LocalLens directory card
-│   │   ├── BusinessModal.tsx        # Business detail + open jobs + events
-│   │   ├── EventCard.tsx            # Community event card with live RSVP
-│   │   ├── JobCard.tsx              # CareerLink job card
-│   │   ├── ApplyModal.tsx           # Quick Apply resume submission form
-│   │   ├── TalentCard.tsx           # Talent network profile card
-│   │   ├── CommunityFeed.tsx        # Community discussion board
-│   │   ├── DashboardView.tsx        # Employer & student management portal
-│   │   └── modals/                  # Creation modals (Register, Job, Event, etc.)
-│   ├── lib/
-│   │   ├── db.ts                    # Backend data layer & persistence
-│   │   └── initialData.ts           # Realistic seed data
-│   └── types/
-│       └── index.ts                 # TypeScript interfaces
-├── package.json
-└── README.md
-```
+## Product areas
 
----
+- **Explore:** searchable marketplace overview
+- **Places:** businesses, venues, and local services
+- **Events:** community gatherings with capacity-limited RSVPs
+- **Work:** local, hybrid, and remote jobs or projects with applications
+- **Talent:** freelancer and skills directory
+- **Community:** discussions and member interactions
+- **Dashboard:** applications, event attendance, and business activity
+- **Admin:** member roles, listing moderation, and sample listing seeding
 
-## 🌐 Free Production Deployment (Vercel)
+## Commands
 
-You can deploy DAPIT online for **$0 forever**:
-1. Push this folder to a GitHub repository.
-2. Go to [Vercel](https://vercel.com/) and click **"Add New Project"**.
-3. Import your GitHub repository.
-4. Click **"Deploy"** (Vercel automatically detects Next.js).
-5. Your platform will be live at `https://your-project.vercel.app` with free SSL and serverless API endpoints!
+- `npm run dev` — local development
+- `npm run build` — production build
+- `npm run start` — serve a production build
+- `npm run lint` — lint the project
